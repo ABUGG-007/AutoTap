@@ -42,7 +42,7 @@ def main():
     else:
         base_path = os.path.dirname(os.path.dirname(__file__))
 
-    icon_path = os.path.join(base_path, 'icon.png')
+    icon_path = os.path.join(base_path, 'icon.ico')
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

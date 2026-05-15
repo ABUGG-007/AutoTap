@@ -106,9 +106,9 @@ class AutoTapWindow(QMainWindow):
 
         import os, sys
         if getattr(sys, 'frozen', False):
-            icon_path = os.path.join(sys._MEIPASS, 'icon.png')
+            icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
         else:
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.png')
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.ico')
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 

@@ -5,6 +5,7 @@
 """
 
 import os
+import sys
 from typing import Optional, Callable
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -70,7 +71,10 @@ class SystemTray(QObject):
     def _init_icons(self) -> None:
         """初始化托盘图标资源。"""
         # 使用主图标文件
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.png')
+        if getattr(sys, 'frozen', False):
+            icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
+        else:
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.ico')
         if os.path.exists(icon_path):
             self._recording_icon = QIcon(icon_path)
             self._playing_icon = QIcon(icon_path)
