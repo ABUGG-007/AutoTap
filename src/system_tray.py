@@ -70,7 +70,7 @@ class SystemTray(QObject):
     def _init_icons(self) -> None:
         """初始化托盘图标资源。"""
         # 使用主图标文件
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.ico')
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.png')
         if os.path.exists(icon_path):
             self._recording_icon = QIcon(icon_path)
             self._playing_icon = QIcon(icon_path)

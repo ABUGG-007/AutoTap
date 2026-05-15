@@ -3,8 +3,8 @@
 AppName=AutoTap
 AppVersion=2.0.0
 AppPublisher=AutoTap
-AppPublisherURL=https://github.com/autotap
-AppSupportURL=https://github.com/autotap
+AppPublisherURL=https://github.com/ABUGG-007/AutoTap
+AppSupportURL=https://github.com/ABUGG-007/AutoTap
 DefaultDirName={autopf}\AutoTap
 DefaultGroupName=AutoTap
 OutputBaseFilename=AutoTap_Setup_2.0.0

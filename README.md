@@ -1,88 +1,130 @@
 <br />
 
+# AutoTap
+
+轻量级 Windows 桌面自动化操作录制与回放工具
+
+录制 → 回放 → 循环 → 轮错
+
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+[![PyQt6](https://img.shields.io/badge/PyQt6-6.5+-green.svg)](https://riverbankcomputing.com/software/pyqt/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+</div>
+
 ***
 
-# Features
+## 功能特性
 
-- **操作录制** — 录制鼠标左/右键点击（记录坐标）和键盘输入（字符缓冲合并、独立按键、组合快捷键）
-- **精准回放** — 按原始时间间隔回放，支持 0.5x\~4.0x 速度调节
-- **循环执行** — 支持有限次循环和无限循环
-- **轮错机制** — 为操作配置多个备选坐标/按键，循环回放时自动轮换，适应动态变化的界面
-- **全局热键** — F9 录制切换、F10 回放切换、Esc 紧急停止（基于 Win32 RegisterHotKey，不与录制监听冲突）
-- **模板管理** — 将操作序列保存为模板，随时加载复用
-- **系统托盘** — 最小化到托盘，后台运行，托盘菜单控制核心功能
-- **便携/安装双版本** — 提供绿色便携版（ZIP）和 Windows 安装包（Setup.exe）
+- 🎬 **操作录制** — 录制鼠标点击（左键/右键）和键盘输入（字符、独立按键、组合快捷键），自动过滤系统快捷键
+- ⏱️ **精准回放** — 按原始时间间隔回放，支持 0.5x \~ 4.0x 速度调节
+- 🔁 **循环执行** — 支持有限次循环和无限循环
+- 🔄 **轮错机制** — 为操作配置多个备选坐标/按键，循环回放时自动轮换，适应动态界面
+- ⌨️ **全局热键** — F9 录制 / F10 回放 / Esc 停止，基于 Win32 RegisterHotKey 实现，不与录制监听冲突
+- 📋 **模板管理** — 保存操作序列为模板，随时加载复用
+- 🖥️ **系统托盘** — 最小化到托盘后台运行，托盘菜单控制核心功能
+- 📦 **双版本分发** — 绿色便携版（ZIP）和 Windows 安装包（Setup.exe）
 
-## Quick Start
+## 快速开始
 
-### 下载即用（推荐）
+### 下载安装
 
-从 [Releases](https://github.com/yourusername/AutoTap/releases) 下载最新版本：
+从 [Releases](https://github.com/ABUGG-007/AutoTap/releases) 下载最新版本：
 
 | 包类型 | 文件                           | 说明               |
 | --- | ---------------------------- | ---------------- |
-| 安装包 | `AutoTap_Setup_x.x.x.exe`    | 带安装向导，自动创建桌面快捷方式 |
-| 便携版 | `AutoTap_x.x.x_Portable.zip` | 解压即用，无需安装        |
+| 安装包 | `AutoTap_2.0.0_Setup.exe` | 解压后运行 install.bat 安装，自动创建桌面快捷方式 |
+| 便携版 | `AutoTap_2.0.0_Portable.zip` | 解压即用，无需安装 |
 
-> 最低要求：Windows 10 64bit
+> 系统要求：Windows 10 64bit 及以上
 
 ### 从源码运行
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/yourusername/AutoTap.git
+git clone https://github.com/ABUGG-007/AutoTap.git
 cd AutoTap
-
-# 2. 安装依赖
 pip install -r requirements.txt
-
-# 3. 运行
 python src/main.py
 ```
 
-## Usage
+## 使用指南
 
-### 录制操作
+### 基本流程
 
-1. 点击 **开始录制**（或按 `F9`）
-2. 正常操作你的鼠标和键盘，所有操作将被记录
-3. 点击 **停止录制**（或按 `F9`）
-4. 录制的操作序列显示在操作列表中
+1. 按 `F9` 或点击 **开始录制**，正常操作鼠标和键盘
+2. 再按 `F9` 停止录制，操作序列显示在列表中
+3. 调整回放速度和循环次数
+4. 按 `F10` 或点击 **开始回放**
+5. 按 `Esc` 紧急停止
 
-> 录制过程中会自动过滤 F9/F10/Esc 等系统快捷键。
-
-### 回放操作
-
-1. 录制完成后，调整 **回放速度** 和 **循环次数**
-2. 点击 **开始回放**（或按 `F10`）
-3. 回放过程中可点击 **停止**（或按 `Esc`）紧急终止
-
-### 操作列表管理
-
-| 操作    | 说明                      |
-| ----- | ----------------------- |
-| 删除操作  | 右键 → 删除，或选中后点击清空        |
-| 编辑间隔  | 双击表格中的间隔单元格直接修改         |
-| 插入轮错  | 右键 → 插入轮错，配置备选坐标或按键     |
-| 保存/加载 | 工具栏按钮保存为 JSON 文件或加载已有文件 |
-| 保存为模板 | 将当前序列保存为模板，便于后续复用       |
-
-### 全局快捷键
+### 快捷键
 
 | 快捷键   | 功能          |
 | ----- | ----------- |
 | `F9`  | 切换录制（开始/停止） |
 | `F10` | 切换回放（开始/停止） |
-| `Esc` | 紧急停止（录制或回放） |
+| `Esc` | 紧急停止        |
 
-### 模板管理
+### 操作列表管理
 
-右侧面板管理模板：
+- **删除** — 右键操作 → 删除
+- **编辑间隔** — 双击间隔单元格直接修改
+- **插入轮错** — 右键操作 → 插入轮错，配置备选坐标或按键
+- **保存/加载** — 保存为 JSON 文件或加载已有文件
+- **保存为模板** — 将当前序列保存为模板供后续复用
 
-- **使用** — 加载模板中的操作序列到当前列表
-- **删除** — 删除不需要的模板
+### 轮错机制说明
 
-## Build
+轮错（Round-Robin Error Offset）允许为单个操作配置多个备选执行方案。回放时，第 1 轮执行原始操作，从第 2 轮起依次轮换执行备选操作，循环复用。
+
+例如：某点击操作配置了 3 个轮错坐标 A、B、C，则：
+
+- 第 1 轮 → 原始坐标
+- 第 2 轮 → 坐标 A
+- 第 3 轮 → 坐标 B
+- 第 4 轮 → 坐标 C
+- 第 5 轮 → 坐标 A（循环）
+
+## 技术栈
+
+| 类别     | 技术                           |
+| ------ | ---------------------------- |
+| 编程语言   | Python 3.10+                 |
+| GUI 框架 | PyQt6                        |
+| 输入监听   | pynput                       |
+| 鼠标模拟   | pyautogui                    |
+| 键盘模拟   | Win32 SendInput API (ctypes) |
+| 全局热键   | Win32 RegisterHotKey API     |
+| 数据存储   | JSON                         |
+| 测试     | pytest                       |
+| 打包分发   | PyInstaller + Inno Setup     |
+
+## 项目结构
+
+```
+AutoTap/
+├── src/                     # 源代码
+│   ├── main.py              # 程序入口
+│   ├── main_window.py       # 主窗口 UI（PyQt6）
+│   ├── data_models.py       # 数据模型（Operation / OperationSequence）
+│   ├── recorder.py          # 操作录制管理器
+│   ├── playback_engine.py   # 回放引擎
+│   ├── input_listener.py    # 输入监听封装（pynput）
+│   ├── hotkey_manager.py    # 全局快捷键管理（Win32 API）
+│   ├── config_manager.py    # 配置管理
+│   ├── template_manager.py  # 模板管理
+│   ├── logger.py            # 日志系统
+│   └── system_tray.py       # 系统托盘
+├── config/
+│   └── settings.json        # 应用配置
+├── tests/                   # 单元测试
+├── requirements.txt         # Python 依赖
+├── AutoTap.spec             # PyInstaller 打包配置
+├── installer.iss            # Inno Setup 安装脚本
+└── build_installer.py       # 构建安装包脚本
+```
+
+## 从源码构建
 
 ### 打包为可执行文件
 
@@ -95,7 +137,7 @@ pyinstaller AutoTap.spec
 
 ### 构建安装包
 
-需要安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)：
+需先安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)，然后：
 
 ```bash
 python build_installer.py
@@ -106,45 +148,6 @@ python build_installer.py
 - `dist/AutoTap_x.x.x_Portable.zip` — 便携版
 - `dist/AutoTap_x.x.x_Setup.exe` — 安装包
 
-## Tech Stack
-
-| 类别     | 技术                       |
-| ------ | ------------------------ |
-| 编程语言   | Python 3.10+             |
-| GUI 框架 | PyQt6                    |
-| 输入监听   | pynput                   |
-| 鼠标模拟   | pyautogui                |
-| 键盘模拟   | Win32 API (ctypes)       |
-| 全局热键   | Win32 RegisterHotKey     |
-| 数据存储   | JSON                     |
-| 测试     | pytest                   |
-| 打包     | PyInstaller + Inno Setup |
-
-## Project Structure
-
-```
-AutoTap/
-├── src/                    # 源代码
-│   ├── main.py             # 程序入口
-│   ├── main_window.py      # 主窗口 UI（PyQt6）
-│   ├── data_models.py      # 数据模型（Operation / OperationSequence）
-│   ├── recorder.py          # 操作录制管理器
-│   ├── playback_engine.py  # 回放引擎
-│   ├── input_listener.py   # 输入监听封装
-│   ├── hotkey_manager.py   # 全局快捷键管理
-│   ├── config_manager.py   # 配置管理
-│   ├── template_manager.py # 模板管理
-│   ├── logger.py           # 日志系统
-│   └── system_tray.py      # 系统托盘
-├── config/
-│   └── settings.json       # 应用配置
-├── tests/                  # 单元测试
-├── requirements.txt        # Python 依赖
-├── AutoTap.spec            # PyInstaller 配置
-└── installer.iss           # Inno Setup 安装脚本
-```
-
-## License
+## 许可证
 
 本项目基于 [MIT License](LICENSE) 开源。
-
