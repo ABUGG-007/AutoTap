@@ -27,8 +27,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QDialog,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QIcon, QColor, QCursor, QPainter, QBrush, QPen
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QRect
+from PyQt6.QtGui import QIcon, QColor, QCursor, QPainter, QBrush, QPen, QFont, QPixmap
 
 import threading
 import time
@@ -91,6 +91,7 @@ class AutoTapWindow(QMainWindow):
         self._update_timer: QTimer = QTimer(self)
         self._timestamp_unit_ms: bool = True
         self._position_marker: _PositionMarker | None = None
+        self._recording_overlay: _RecordingOverlay | None = None
 
         self._init_ui()
         self._init_signals()
@@ -199,7 +200,7 @@ class AutoTapWindow(QMainWindow):
         layout.addWidget(self._btn_stop_playback)
         layout.addStretch()
 
-        shortcut_tip = QLabel("F9 录制  |  F10 回放  |  Esc 停止")
+        shortcut_tip = QLabel("F9 录制  |  F10 暂停/回放  |  Esc 停止")
         shortcut_tip.setStyleSheet("color: #6c757d; font-size: 12px;")
         layout.addWidget(shortcut_tip)
 
@@ -459,7 +460,7 @@ class AutoTapWindow(QMainWindow):
         layout.setContentsMargins(12, 6, 12, 6)
         layout.setSpacing(10)
 
-        info = QLabel("AutoTap v2.0  |  全局快捷键: F9录制 F10回放 Esc停止")
+        info = QLabel("AutoTap v2.0  |  全局快捷键: F9录制 F10暂停/回放 Esc停止")
         info.setStyleSheet("color: #adb5bd; font-size: 11px;")
         layout.addWidget(info)
         layout.addStretch()
@@ -633,6 +634,7 @@ class AutoTapWindow(QMainWindow):
             self._btn_start_playback.setEnabled(False)
             self._set_status("录制中...", _C_REC)
             self.recording_started.emit()
+            self.showMinimized()
         else:
             QMessageBox.warning(self, "错误", "无法开始录制")
 
@@ -648,6 +650,10 @@ class AutoTapWindow(QMainWindow):
         self._btn_start_playback.setEnabled(True)
         self._refresh_operation_list()
         self._playback_engine.load_sequence(self._current_sequence)
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
 
         if self._template_recording_name:
             self._has_unsaved_template_data = True
@@ -688,16 +694,33 @@ class AutoTapWindow(QMainWindow):
             self._btn_cancel_template.setVisible(False)
             self._set_status("回放中...", _C_STOP)
             self.playback_started.emit()
+            self._recording_overlay = _RecordingOverlay(self._settings.loop_count, self._settings.infinite_loop)
+            self.showMinimized()
         else:
             QMessageBox.warning(self, "错误", "无法开始回放")
 
     def _on_stop_playback_clicked(self) -> None:
         self._stop_playback()
 
+    def _pause_playback(self) -> None:
+        if not self._playback_engine.is_playing() or self._playback_engine._is_paused:
+            return
+        self._playback_engine.pause()
+        self._set_status("已暂停", "#e67e22")
+
+    def _resume_playback(self) -> None:
+        if not self._playback_engine.is_playing() or not self._playback_engine._is_paused:
+            return
+        self._playback_engine.resume()
+        self._set_status("回放中...", _C_STOP)
+
     def _stop_playback(self) -> None:
         completed_loops, total_loops = self._playback_engine.get_loop_progress()
         is_infinite = self._settings.infinite_loop
         self._playback_engine.stop()
+        if self._recording_overlay:
+            self._recording_overlay.safe_close()
+            self._recording_overlay = None
         self._btn_start_playback.setEnabled(True)
         self._btn_stop_playback.setEnabled(False)
         self._btn_start_record.setEnabled(not self._has_unsaved_template_data)
@@ -716,6 +739,10 @@ class AutoTapWindow(QMainWindow):
             self._lbl_loop_progress.setVisible(False)
         self._set_status("就绪", "#495057")
         self.playback_stopped.emit()
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
 
     def _on_create_template_clicked(self) -> None:
         if self._playback_engine.is_playing():
@@ -755,6 +782,7 @@ class AutoTapWindow(QMainWindow):
             self._set_status(f"录入模板: {self._template_recording_name}", _C_REC)
             self._set_save_status("录入中...", _C_WARN)
             self.recording_started.emit()
+            self.showMinimized()
         else:
             QMessageBox.warning(self, "错误", "无法开始录制")
 
@@ -931,7 +959,10 @@ class AutoTapWindow(QMainWindow):
 
     def _on_hotkey_playback_toggle(self) -> None:
         if self._playback_engine.is_playing():
-            self._stop_playback()
+            if self._playback_engine._is_paused:
+                self._resume_playback()
+            else:
+                self._pause_playback()
         else:
             self._on_start_playback_clicked()
 
@@ -976,11 +1007,20 @@ class AutoTapWindow(QMainWindow):
 
     def _on_playback_progress(self, current: int, total: int) -> None:
         self._lbl_progress.setText(f"进度: {current}/{total}")
+        try:
+            if self._recording_overlay and not self._recording_overlay._closed:
+                completed, _ = self._playback_engine.get_loop_progress()
+                self._recording_overlay.update_loop(completed)
+        except RuntimeError:
+            self._recording_overlay = None
 
     def _on_playback_completed_signal(self) -> None:
         QTimer.singleShot(0, self._on_playback_completed)
 
     def _on_playback_completed(self) -> None:
+        if self._recording_overlay:
+            self._recording_overlay.safe_close()
+            self._recording_overlay = None
         self._btn_start_playback.setEnabled(True)
         self._btn_stop_playback.setEnabled(False)
         self._btn_start_record.setEnabled(not self._has_unsaved_template_data)
@@ -991,6 +1031,10 @@ class AutoTapWindow(QMainWindow):
         self._lbl_loop_progress.setVisible(False)
         self._lbl_loop_progress.setStyleSheet("color: #6c757d; font-size: 12px;")
         self._set_status("就绪", "#495057")
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
         if self._settings.show_notifications:
             QTimer.singleShot(100, self._show_playback_complete_notification)
 
@@ -1134,6 +1178,9 @@ class AutoTapWindow(QMainWindow):
 
         if self._recorder.get_state() == "recording":
             self._recorder.stop_recording()
+        if self._recording_overlay:
+            self._recording_overlay.safe_close()
+            self._recording_overlay = None
         if self._playback_engine.is_playing():
             self._playback_engine.stop()
         self._hotkey_manager.stop()
@@ -1428,4 +1475,144 @@ class _PositionMarker(QWidget):
 
     def closeEvent(self, event) -> None:
         self._timer.stop()
+        super().closeEvent(event)
+
+
+class _RecordingOverlay(QWidget):
+    _DOT_RECT = QRect(25, 27, 20, 20)
+
+    def __init__(self, total_loops: int, infinite: bool) -> None:
+        super().__init__(
+            None,
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowDoesNotAcceptFocus,
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setAutoFillBackground(False)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setFixedSize(250, 250)
+
+        screen = QApplication.primaryScreen()
+        geo = screen.geometry() if screen else None
+        if geo:
+            self.move(geo.right() - 250, geo.top())
+
+        self._completed = 0
+        self._total = total_loops
+        self._infinite = infinite
+        self._pulse_phase = 0
+        self._closed = False
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.timeout.connect(self._on_pulse)
+        self._pulse_timer.start(500)
+
+        self._static_pixmap: QPixmap | None = None
+        self._rebuild_static()
+
+        self.show()
+        self.raise_()
+
+    def _rebuild_static(self) -> None:
+        self._static_pixmap = QPixmap(250, 250)
+        self._static_pixmap.fill(Qt.GlobalColor.transparent)
+        p = QPainter(self._static_pixmap)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        bg = QColor(30, 30, 42, 210)
+        p.setBrush(QBrush(bg))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(0, 0, 250, 250, 24, 24)
+
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(QColor(46, 204, 113, 200)))
+        p.drawEllipse(30, 32, 12, 12)
+
+        font_label = p.font()
+        font_label.setPixelSize(15)
+        font_label.setWeight(QFont.Weight.Medium)
+        p.setFont(font_label)
+        p.setPen(QColor(180, 180, 195))
+        p.drawText(QRect(50, 24, 180, 28), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "PLAY")
+
+        font_hint = p.font()
+        font_hint.setPixelSize(12)
+        font_hint.setWeight(QFont.Weight.Normal)
+        p.setFont(font_hint)
+        p.setPen(QColor(120, 120, 140))
+        p.drawText(QRect(0, 215, 250, 28), Qt.AlignmentFlag.AlignCenter, "F10 pause  ·  Esc stop")
+        p.end()
+
+    def update_loop(self, completed: int) -> None:
+        if self._closed:
+            return
+        if self._completed != completed:
+            self._completed = completed
+            self.update()
+
+    def _on_pulse(self) -> None:
+        if self._closed:
+            return
+        self._pulse_phase = 1 - self._pulse_phase
+        self.update(self._DOT_RECT)
+
+    def paintEvent(self, event) -> None:
+        if self._closed or self._static_pixmap is None:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.drawPixmap(0, 0, self._static_pixmap)
+
+        pulse = 0.6 + 0.4 * self._pulse_phase
+        dot_color = QColor(46, 204, 113, int(180 + 75 * pulse))
+        painter.setBrush(QBrush(dot_color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(30, 32, 12, 12)
+
+        if self._infinite:
+            text = str(self._completed)
+        else:
+            text = f"{self._completed}/{self._total}"
+
+        font_num = painter.font()
+        font_num.setPixelSize(60)
+        font_num.setWeight(QFont.Weight.Bold)
+        painter.setFont(font_num)
+        painter.setPen(QColor(255, 255, 255))
+        fm = painter.fontMetrics()
+        tw = fm.horizontalAdvance(text)
+        painter.drawText((250 - tw) // 2, 125, text)
+
+        font_sub = painter.font()
+        font_sub.setPixelSize(14)
+        font_sub.setWeight(QFont.Weight.Normal)
+        painter.setFont(font_sub)
+        painter.setPen(QColor(140, 140, 160))
+        if self._infinite:
+            sub_text = "loops completed"
+        else:
+            sub_text = "loops progress"
+        painter.drawText(QRect(0, 145, 250, 30), Qt.AlignmentFlag.AlignCenter, sub_text)
+
+        if not self._infinite and self._total > 0:
+            bar_x, bar_y, bar_w, bar_h = 30, 185, 190, 8
+            painter.setBrush(QBrush(QColor(60, 60, 80)))
+            painter.drawRoundedRect(bar_x, bar_y, bar_w, bar_h, 4, 4)
+            fill_w = int(bar_w * min(self._completed / self._total, 1.0))
+            if fill_w > 0:
+                painter.setBrush(QBrush(QColor(46, 204, 113)))
+                painter.drawRoundedRect(bar_x, bar_y, fill_w, bar_h, 4, 4)
+
+    def safe_close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._pulse_timer.stop()
+        self.close()
+
+    def closeEvent(self, event) -> None:
+        self._closed = True
+        self._pulse_timer.stop()
         super().closeEvent(event)

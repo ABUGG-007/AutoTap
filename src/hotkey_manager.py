@@ -2,7 +2,7 @@ import ctypes
 import ctypes.wintypes
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from src.logger import log_error
+from src.logger import log_error, log_info
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -39,10 +39,17 @@ class HotkeyListenerThread(QThread):
         self._registered = False
 
     def run(self):
+        for hotkey_id, _, _ in HOTKEY_DEFS:
+            user32.UnregisterHotKey(None, hotkey_id)
+
         for hotkey_id, mod, vk in HOTKEY_DEFS:
             if not user32.RegisterHotKey(None, hotkey_id, mod, vk):
+                log_error(f"RegisterHotKey 失败: id={hotkey_id} vk={vk}", "HotkeyListenerThread")
+                for hid, _, _ in HOTKEY_DEFS:
+                    user32.UnregisterHotKey(None, hid)
                 return
         self._registered = True
+        log_info("全局快捷键注册成功", "HotkeyListenerThread")
 
         msg = MSG()
         while self._registered:
