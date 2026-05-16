@@ -10,6 +10,11 @@ DIST_DIR = os.path.join(ROOT, "dist", "AutoTap")
 OUTPUT_ZIP = os.path.join(ROOT, "dist", "AutoTap_2.0.0_Portable.zip")
 OUTPUT_INSTALLER = os.path.join(ROOT, "dist", "AutoTap_2.0.0_Setup.exe")
 
+SEVEN_ZIP_DIR = r"C:\Program Files\7-Zip"
+SEVEN_ZIP_EXE = os.path.join(SEVEN_ZIP_DIR, "7z.exe")
+SFX_MODULE = os.path.join(SEVEN_ZIP_DIR, "7z.sfx")
+
+
 def create_portable_zip():
     if not os.path.exists(DIST_DIR):
         print(f"错误: {DIST_DIR} 不存在，请先运行 pyinstaller")
@@ -26,7 +31,48 @@ def create_portable_zip():
     print(f"便携版已创建: {OUTPUT_ZIP} ({size_mb:.1f} MB)")
     return True
 
-def create_installer():
+
+def create_sfx_installer():
+    if not os.path.exists(SEVEN_ZIP_EXE):
+        print(f"错误: 未找到 7-Zip ({SEVEN_ZIP_EXE})")
+        return False
+    if not os.path.exists(SFX_MODULE):
+        print(f"错误: 未找到 7z.sfx 模块 ({SFX_MODULE})")
+        return False
+    if not os.path.exists(OUTPUT_ZIP):
+        print(f"错误: 便携版 ZIP 不存在 ({OUTPUT_ZIP})")
+        return False
+
+    config = """;!@Install@!UTF-8!
+Title="AutoTap v2.0.0 安装程序"
+BeginPrompt="欢迎使用 AutoTap v2.0.0\n\n点击「确定」开始安装"
+ExtractPath="%PROGRAMFILES%\\AutoTap"
+RunProgram="AutoTap.exe"
+;!@InstallEnd@!"""
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        sfx_output = OUTPUT_INSTALLER
+
+        with open(os.path.join(temp_dir, "config.txt"), 'w', encoding='utf-8') as f:
+            f.write(config)
+
+        with open(sfx_output, 'wb') as out_f:
+            with open(SFX_MODULE, 'rb') as sfx_f:
+                shutil.copyfileobj(sfx_f, out_f)
+            with open(os.path.join(temp_dir, "config.txt"), 'rb') as cfg_f:
+                shutil.copyfileobj(cfg_f, out_f)
+            with open(OUTPUT_ZIP, 'rb') as zip_f:
+                shutil.copyfileobj(zip_f, out_f)
+
+        size_mb = os.path.getsize(sfx_output) / (1024 * 1024)
+        print(f"安装包已创建: {sfx_output} ({size_mb:.1f} MB)")
+        return True
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def create_inno_installer():
     iscc_paths = [
         r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
         r"C:\Program Files\Inno Setup 6\ISCC.exe",
@@ -49,78 +95,13 @@ def create_installer():
             print(f"Inno Setup 编译失败: {result.stderr}")
             return False
     else:
-        print("未找到 Inno Setup，创建自解压安装包...")
-        return create_self_extracting_installer()
+        print("未找到 Inno Setup，使用 7z SFX 创建安装包...")
+        return create_sfx_installer()
 
-def create_self_extracting_installer():
-    script = '''@echo off
-title AutoTap 2.0.0 安装程序
-echo ============================================
-echo        AutoTap v2.0.0 安装程序
-echo ============================================
-echo.
-set "INSTALL_DIR=%ProgramFiles%\\AutoTap"
-set /p "INSTALL_DIR=请输入安装目录 (默认: %ProgramFiles%\\AutoTap): "
-if "%INSTALL_DIR%"=="" set "INSTALL_DIR=%ProgramFiles%\\AutoTap"
-echo.
-echo 正在安装到: %INSTALL_DIR%
-echo.
-
-if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
-
-echo 正在解压文件...
-powershell -Command "Expand-Archive -Path '%~dp0AutoTap.zip' -DestinationPath '%INSTALL_DIR%\\..' -Force"
-
-echo.
-echo 正在创建快捷方式...
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\\AutoTap.lnk'); $sc.TargetPath = '%INSTALL_DIR%\\AutoTap.exe'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Save()"
-
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut([Environment]::GetFolderPath('CommonStartMenu') + '\\Programs\\AutoTap.lnk'); $sc.TargetPath = '%INSTALL_DIR%\\AutoTap.exe'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Save()"
-
-echo.
-echo ============================================
-echo        安装完成!
-echo ============================================
-echo.
-echo 桌面快捷方式已创建
-echo.
-choice /C YN /M "是否立即启动 AutoTap"
-if %ERRORLEVEL%==1 start "" "%INSTALL_DIR%\\AutoTap.exe"
-exit
-'''
-    zip_path = OUTPUT_ZIP
-    if not os.path.exists(zip_path):
-        print("错误: 便携版 ZIP 不存在")
-        return False
-
-    temp_dir = tempfile.mkdtemp()
-    try:
-        bat_path = os.path.join(temp_dir, "install.bat")
-        with open(bat_path, 'w', encoding='gbk') as f:
-            f.write(script)
-
-        zip_dest = os.path.join(temp_dir, "AutoTap.zip")
-        shutil.copy2(zip_path, zip_dest)
-
-        sfx_path = OUTPUT_INSTALLER
-        with zipfile.ZipFile(sfx_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-            zf.write(bat_path, "install.bat")
-            zf.write(zip_dest, "AutoTap.zip")
-
-        bat_name = os.path.basename(bat_path)
-        with open(sfx_path, 'ab') as f:
-            pass
-
-        size_mb = os.path.getsize(sfx_path) / (1024 * 1024)
-        print(f"自解压安装包已创建: {sfx_path} ({size_mb:.1f} MB)")
-        print("注意: 此安装包为ZIP格式，解压后运行 install.bat 即可安装")
-        return True
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     if not create_portable_zip():
         sys.exit(1)
-    if not create_installer():
+    if not create_inno_installer():
         sys.exit(1)
     print("\n所有包已生成完毕!")
